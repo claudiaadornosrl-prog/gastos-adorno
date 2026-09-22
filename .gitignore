@@ -1,0 +1,14 @@
+# Repo PUBLICO: solo lo que Pages sirve. deploy.ps1 hace git add -A, asi que esto es la unica defensa.
+.env
+*.key
+*.pem
+*.py
+*.sql
+*.md
+!README.md
+*.log
+*.csv
+*.xlsx
+*.xls
+backups/
+_*/

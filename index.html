@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+// ═══ SESIÓN COMPARTIDA ENTRE MÓDULOS · SSO Adorno (10-sep-2026) ═══
+// Todos los módulos viven en el mismo origen (claudiaadornosrl-prog.github.io),
+// así que pueden compartir la sesión: se guarda bajo la clave 'adorno-auth' en
+// vez de una por módulo. Que un módulo te deje pasar SIN escribir la clave
+// depende de dos marcas, y alcanza con una:
+//   · dispositivo confiable → se tilda UNA vez en el Hub ("Confiar en esta
+//     computadora"). Vale para todos los módulos de ese equipo. Pensado para
+//     la PC de JP; en los locales, que son compartidos, nadie la tilda.
+//   · módulo recordado → ya te habías logueado en ESE módulo con ese mismo
+//     usuario. Conserva el comportamiento de siempre para las vendedoras.
+// Sin ninguna de las dos, el módulo pide usuario y contraseña como antes.
+window.ADORNO_SSO = (function () {
+  var KEY = 'adorno-auth', DEV = 'adorno-equipo-confiable', MOD = 'adorno-modulo-';
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  return {
+    KEY: KEY,
+    // Al estrenar la clave compartida, adopta la sesión que este módulo ya
+    // tenía guardada con su clave vieja: nadie se queda afuera por el cambio.
+    migrar: function (keyVieja, modulo) {
+      if (!keyVieja) return;
+      var v = get(keyVieja);
+      if (!v) return;
+      // La sesión se copia una sola vez; la marca del módulo se pone siempre
+      // que este módulo tuviera sesión propia — Documentos y Compras
+      // compartían la clave por defecto y si no, al segundo le pediría login.
+      if (!get(KEY)) set(KEY, v);
+      var mail = '1';
+      try { mail = (JSON.parse(v).user || {}).email || '1'; } catch (e) {}
+      set(MOD + modulo, String(mail).toLowerCase());
+    },
+    confiable: function () { return get(DEV) === '1'; },
+    confiar: function (si) { si ? set(DEV, '1') : del(DEV); },
+    recordar: function (modulo, email) { set(MOD + modulo, String(email || '1').toLowerCase()); },
+    entraDirecto: function (modulo, email) {
+      if (this.confiable()) return true;
+      var m = get(MOD + modulo);
+      return !!m && (m === '1' || m === String(email || '').toLowerCase());
+    },
+    // Al cerrar sesión se olvidan los módulos, pero NO que el equipo es de
+    // confianza: eso es una propiedad de la computadora, no de la sesión.
+    olvidarModulos: function () {
+      try {
+        Object.keys(localStorage).filter(function (k) { return k.indexOf(MOD) === 0; }).forEach(del);
+      } catch (e) {}
+    }
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>📒 Gastos · Claudia Adorno</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192-v2.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📒%3C/text%3E%3C/svg%3E">
+
+<style>
+@font-face { font-family: 'URW Gothic'; src: url('fonts/URWGothic-Book.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
+:root { --primary: #0f766e; --primary-dark: #115e59; --primary-bg: #f0fdfa; --green:#16a34a; --green-bg:#dcfce7; --amber:#d97706; --amber-bg:#fef3c7;
+        --red:#dc2626; --red-bg:#fee2e2; --gray:#64748b; --gray-light:#f1f5f9; --border:#e2e8f0; --text:#0f172a; --muted:#64748b; }
+* { box-sizing: border-box; }
+body { font-family: 'URW Gothic', -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: var(--text); }
+#login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); }
+.login-card { background: white; border-radius: 16px; padding: 32px 28px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.login-card h1 { margin: 0 0 4px; font-size: 24px; color: var(--primary); text-align: center; }
+.login-card .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.login-card label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.login-card input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; }
+.login-card button { width: 100%; margin-top: 18px; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.login-card button:disabled { opacity: .5; }
+#login-error { color: var(--red); font-size: 13px; margin-top: 12px; min-height: 18px; }
+#app { display: none; }
+header { background: white; border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; }
+header h1 { margin: 0; font-size: 18px; color: var(--primary); }
+header .spacer { flex: 1; } header .user-info { font-size: 13px; color: var(--muted); }
+header button.logout, .btn { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+.btn.danger { color: var(--red); border-color: var(--red); }
+nav.tabs { display: flex; gap: 4px; padding: 8px 20px; background: white; border-bottom: 1px solid var(--border); overflow-x: auto; }
+nav.tabs button { background: transparent; border: none; padding: 10px 16px; font-size: 14px; cursor: pointer; color: var(--muted); border-radius: 8px 8px 0 0; white-space: nowrap; font-family: inherit; }
+nav.tabs button.active { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+.filters { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.filters label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.filters select, .filters input, .form select, .form input, .form textarea { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px; background: white; font-family: inherit; }
+.filters .stat { margin-left: auto; font-size: 13px; color: var(--muted); }
+.tab-content { display: none; } .tab-content.active { display: block; }
+table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+th, td { padding: 9px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+th { background: var(--gray-light); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.nivel1 td { background: var(--primary-bg); font-weight: 700; } tr.nivel2 td { background: #f8fafc; font-weight: 600; }
+tr.dim { color: var(--muted); }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.chip.green { background: var(--green-bg); color: var(--green); } .chip.amber { background: var(--amber-bg); color: var(--amber); }
+.chip.red { background: var(--red-bg); color: var(--red); } .chip.gray { background: var(--gray-light); color: var(--muted); }
+.empty { padding: 50px 20px; text-align: center; color: var(--muted); background: white; border-radius: 10px; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 1000; }
+.toast.error { background: var(--red); } .toast.success { background: var(--green); }
+.card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+.card h3 { margin: 0 0 8px; font-size: 15px; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
+.form label { font-size: 12px; color: var(--muted); font-weight: 600; display: flex; flex-direction: column; gap: 4px; }
+.mini { font-size: 12px; color: var(--muted); }
+.prueba { background: #fef3c7; color: #92400e; text-align: center; padding: 4px; font-size: 12px; font-weight: 600; }
+#ov { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 16px; }
+#ov .box { background: white; border-radius: 12px; padding: 18px; max-width: 720px; width: 100%; max-height: 90vh; overflow: auto; }
+@media (max-width: 600px) { main { padding: 10px; } th, td { padding: 8px 8px; font-size: 13px; } header h1 { font-size: 16px; } }
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <h1>📒 Gastos</h1>
+    <div class="sub">La planilla de gastos, armada desde Compras, RRHH e Impuestos<br>Claudia Adorno SRL</div>
+    <label>Email</label>
+    <input type="email" id="email" placeholder="tu_email@ejemplo.com" autocomplete="username">
+    <label>Contraseña</label>
+    <input type="password" id="pass" placeholder="••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+    <button onclick="doLogin()" id="btn-login">Entrar</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+<div id="app">
+  <div id="franja-prueba" class="prueba" style="display:none">🧪 MODO PRUEBA · solo se ven los comprobantes de test</div>
+  <header>
+    <a href="https://claudiaadornosrl-prog.github.io/hub/" title="Volver al Hub" style="text-decoration:none;font-size:17px;line-height:1;color:inherit;opacity:.65;padding:4px 8px;border-radius:8px;">↩</a>
+    <h1>📒 Gastos · Claudia Adorno</h1>
+    <div class="spacer"></div>
+    <div class="user-info" id="user-info"></div>
+    <button class="logout" onclick="doLogout()">Salir</button>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button id="tab-planilla" class="active" onclick="switchTab('planilla')">📒 Planilla</button>
+    <button id="tab-manual" class="" onclick="switchTab('manual')">✍️ A mano</button>
+    <button id="tab-bolsas" class="" onclick="switchTab('bolsas')">🛍 Bolsas</button>
+    <button id="tab-resumen" class="" onclick="switchTab('resumen')">📊 Año</button>
+  </nav>
+  <main>
+
+    <section id="content-planilla" class="tab-content active">
+      <div class="filters">
+        <label>Mes</label><select id="p-mes" onchange="renderPlanilla()"></select>
+        <label>Año</label><select id="p-anio" onchange="renderPlanilla()"></select>
+        <label>Unidad</label><select id="p-unidad" onchange="renderPlanilla()"><option value="">Todas</option></select>
+        <button class="btn" onclick="renderPlanilla()">🔄</button>
+        <div class="stat" id="p-stat"></div>
+      </div>
+      <div id="p-body"></div>
+    </section>
+    <section id="content-manual" class="tab-content">
+      <div class="card">
+        <h3>➕ Renglón sin comprobante en Compras</h3>
+        <div class="mini" style="margin-bottom:8px">Para lo que hoy tampoco tiene factura: resúmenes de tarjetas (First Data, AMEX), banco, gastos GNC sin comprobante. Lo que SÍ tiene factura entra solo desde Compras.</div>
+        <div class="form">
+          <label>Mes <select id="g-mes"></select></label>
+          <label>Año <select id="g-anio"></select></label>
+          <label>Unidad <select id="g-unidad"></select></label>
+          <label>Categoría <select id="g-cat"></select></label>
+          <label>Descripción <input id="g-desc" placeholder="First Data · Banco Pesos · Limpieza…"></label>
+          <label>Tipo <select id="g-tipo"><option>Resu</option><option>GNC</option><option>Otro</option><option>FC</option><option>NC</option><option>ND</option><option>RBO</option></select></label>
+          <label>N° <input id="g-num" placeholder="opcional"></label>
+          <label>Importe <input id="g-imp" type="number" step="0.01"></label>
+          <label style="grid-column:1/-1">Notas <input id="g-notas"></label>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px"><button class="btn primary" onclick="guardarManual()">Guardar</button><button class="btn" onclick="limpiarManual()">Limpiar</button></div>
+      </div>
+      <div class="card"><h3>Cargados a mano</h3><div id="g-lista"></div></div>
+    </section>
+    <section id="content-bolsas" class="tab-content">
+      <div class="card">
+        <h3>🛍 Bolsas del año</h3>
+        <div class="mini" style="margin-bottom:8px">Lista de facturas de bolsas (FESEK, ROMI…). El total del año se reparte en Alcorta y Unicenter, mes a mes, por la venta de cada uno — igual que la hoja "Bolsas" de la planilla. Cargar una factura nueva recalcula todos los meses.</div>
+        <div class="form">
+          <label>Año <select id="b-anio"></select></label>
+          <label>Fecha <input id="b-fecha" type="date"></label>
+          <label>Proveedor <input id="b-prov" placeholder="FESEK SRL"></label>
+          <label>Comprobante <input id="b-comp" placeholder="FC 0001-00001234"></label>
+          <label>Importe neto <input id="b-imp" type="number" step="0.01"></label>
+        </div>
+        <div style="margin-top:8px"><button class="btn primary" onclick="guardarBolsa()">Agregar</button></div>
+      </div>
+      <div class="card"><div id="b-lista"></div></div>
+    </section>
+    <section id="content-resumen" class="tab-content">
+      <div class="filters">
+        <label>Año</label><select id="r-anio" onchange="renderResumen()"></select>
+        <label><input type="checkbox" id="r-todo" onchange="renderResumen()"> incluir meses sin cerrar</label>
+        <div class="stat" id="r-stat"></div>
+      </div>
+      <div id="r-body"></div>
+    </section>
+
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL  = 'https://kwwiykssrpabncpqtmwi.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3d2l5a3NzcnBhYm5jcHF0bXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjI1NTQsImV4cCI6MjA5NDkzODU1NH0.O1VhKdjPahnJJ9qXcQuSKQbnKGhsEZqYmjDEfRuRpkc';
+const MODULO = 'gastos';
+ADORNO_SSO.migrar('sb-kwwiykssrpabncpqtmwi-auth-token', MODULO);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: true, autoRefreshToken: true, storageKey: ADORNO_SSO.KEY } });
+(function (mod) {
+  var inOrig = sb.auth.signInWithPassword.bind(sb.auth);
+  sb.auth.signInWithPassword = async function (cred) { var r = await inOrig(cred); if (!r.error && r.data && r.data.user) ADORNO_SSO.recordar(mod, r.data.user.email); return r; };
+  var outOrig = sb.auth.signOut.bind(sb.auth);
+  sb.auth.signOut = async function () { ADORNO_SSO.olvidarModulos(); return outOrig.apply(null, arguments); };
+})(MODULO);
+
+// 🧪 AMBIENTE DE PRUEBA: mismo interruptor que Compras (constante). true = solo comprobantes de test.
+// Cuando Compras pase a definitivo, pasar acá también a false.
+const MODO_PRUEBA = true;
+let session = null;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const plata = n => (n == null || isNaN(n)) ? '—' : '$ ' + Number(n).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+const plata2 = n => (n == null || isNaN(n)) ? '—' : '$ ' + Number(n).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function hoyAR() { const p = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Argentina/Buenos_Aires', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date()); return p; }
+function toast(msg, tipo) { const t = document.createElement('div'); t.className = 'toast ' + (tipo || ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); }
+function switchTab(k) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.id === 'tab-' + k));
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === 'content-' + k));
+  if (typeof onTab === 'function') onTab(k);
+}
+async function doLogin() {
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const pass  = document.getElementById('pass').value;
+  const errEl = document.getElementById('login-error'); errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Email y contraseña obligatorios'; return; }
+  document.getElementById('btn-login').disabled = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    await entrar(data.user);
+  } catch (e) { errEl.textContent = 'Error: ' + (e.message || 'desconocido'); }
+  finally { document.getElementById('btn-login').disabled = false; }
+}
+async function entrar(user) {
+  const { data: ok } = await sb.rpc('gastos_es_usuario');
+  if (!ok) { await sb.auth.signOut(); document.getElementById('login-error').textContent = 'Tu usuario no tiene acceso a este módulo.'; return; }
+  session = { email: user.email, user };
+  document.getElementById('user-info').textContent = user.email;
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('franja-prueba').style.display = MODO_PRUEBA ? 'block' : 'none';
+  await init();
+}
+async function doLogout() { await sb.auth.signOut(); location.reload(); }
+(async () => {
+  const { data: { session: s } } = await sb.auth.getSession();
+  if (s && ADORNO_SSO.entraDirecto(MODULO, s.user?.email)) await entrar(s.user);
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+
+
+let UNIDADES = [], CATS = [], esAdmin = false;
+const uniNombre = k => (UNIDADES.find(u => u.clave === k) || {}).nombre || k || '—';
+const catNombre = k => (CATS.find(c => c.clave === k) || {}).nombre || k || '—';
+async function init(){
+  const [u, c, a] = await Promise.all([
+    sb.from('gastos_unidades').select('*').eq('activo', true).order('orden'),
+    sb.from('gastos_categorias').select('*').eq('activo', true).order('orden'),
+    sb.rpc('rrhh_is_admin')]);
+  UNIDADES = u.data || []; CATS = c.data || []; esAdmin = !!a.data;
+  const hoy = hoyAR(); const y = Number(hoy.slice(0,4)), m = Number(hoy.slice(5,7));
+  for (const id of ['p-mes','g-mes']) document.getElementById(id).innerHTML = MESES.map((x,i) => `<option value="${i+1}" ${i+1===m?'selected':''}>${x}</option>`).join('');
+  for (const id of ['p-anio','g-anio','b-anio','r-anio']) document.getElementById(id).innerHTML = [y-1,y,y+1].map(v => `<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  document.getElementById('p-unidad').innerHTML += UNIDADES.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
+  document.getElementById('g-unidad').innerHTML = UNIDADES.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
+  document.getElementById('g-cat').innerHTML = CATS.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
+  await renderPlanilla();
+}
+function onTab(k){ if (k === 'manual') renderManuales(); if (k === 'bolsas') renderBolsas(); if (k === 'resumen') renderResumen(); }
+const perSel = (pm, pa) => `${document.getElementById(pa).value}-${String(document.getElementById(pm).value).padStart(2,'0')}-01`;
+
+// ── 📒 Planilla del mes ──
+let CIERRES = [];
+async function renderPlanilla(){
+  const per = perSel('p-mes','p-anio'); const fu = document.getElementById('p-unidad').value;
+  document.getElementById('p-body').innerHTML = '<div class="empty">Armando la planilla…</div>';
+  const [{ data: rows, error }, { data: ci }] = await Promise.all([
+    sb.rpc('gastos_planilla', { p_periodo: per, p_prueba: MODO_PRUEBA }),
+    sb.from('gastos_cierres').select('*').eq('periodo', per).eq('es_prueba', MODO_PRUEBA)]);
+  if (error){ document.getElementById('p-body').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
+  CIERRES = ci || [];
+  const R = (rows || []).filter(r => !fu || r.unidad === fu);
+  if (!R.length){ document.getElementById('p-body').innerHTML = '<div class="empty">Nada cargado para este mes.</div>'; document.getElementById('p-stat').textContent = ''; return; }
+  let total = 0, html = '';
+  for (const u of UNIDADES.filter(x => !fu || x.clave === fu)){
+    const ru = R.filter(r => r.unidad === u.clave); if (!ru.length) continue;
+    const tu = ru.reduce((a, r) => a + Number(r.importe || 0), 0); total += tu;
+    const cerrado = CIERRES.some(c => c.unidad === u.clave);
+    html += `<table style="margin-bottom:14px"><tr class="nivel1"><td colspan="5">${esc(u.nombre)}
+        ${cerrado ? `<span class="chip green" style="margin-left:8px">☑ Cerrado</span> ${esAdmin ? `<button class="btn" style="margin-left:6px" onclick="cerrar('${u.clave}', false)">Reabrir</button>` : ''}`
+                  : `<button class="btn" style="margin-left:8px" onclick="cerrar('${u.clave}', true)">Cerrar mes</button>`}</td>
+      <td class="num">${plata(tu)}</td></tr>`;
+    for (const c of CATS){
+      const rc = ru.filter(r => r.categoria === c.clave); if (!rc.length) continue;
+      const tc = rc.reduce((a, r) => a + Number(r.importe || 0), 0);
+      html += `<tr class="nivel2"><td colspan="5" style="padding-left:28px">${esc(c.nombre)}</td><td class="num">${plata(tc)}</td></tr>`;
+      for (const r of rc){
+        const fuente = {compras:'📄', compras_linea:'📄', rrhh:'👥', impuestos:'🏛', manual:'✍️', bolsas:'🛍'}[r.fuente] || '';
+        const link = r.fuente === 'compras' ? `<a href="https://claudiaadornosrl-prog.github.io/compras-adorno/?doc=${r.ref_id}" target="_blank" title="Abrir en Compras" style="text-decoration:none">📄</a>` : fuente;
+        const accion = r.fuente === 'manual' ? `<button class="btn" onclick="borrarManual(${r.ref_id})" title="Borrar">🗑</button>` : '';
+        html += `<tr class="${r.ok ? '' : 'dim'}"><td style="padding-left:44px">${link} ${esc(r.descripcion)}</td><td>${esc(r.tipo || '')}</td><td class="mini">${esc(r.numero || '')}</td>
+          <td class="mini" title="${esc(r.detalle || '')}">${esc((r.detalle || '').slice(0, 60))}${(r.detalle || '').length > 60 ? '…' : ''}</td><td>${accion}</td><td class="num">${plata(r.importe)}</td></tr>`;
+      }
+    }
+    html += '</table>';
+  }
+  document.getElementById('p-body').innerHTML = html;
+  document.getElementById('p-stat').innerHTML = `Total del mes: <strong>${plata(total)}</strong> · ${R.length} renglones`;
+}
+async function cerrar(unidad, si){
+  const per = perSel('p-mes','p-anio');
+  if (si && !confirm(`¿Cerrar ${uniNombre(unidad)} de ${MESES[Number(per.slice(5,7))-1]}?\n\nRecién ahí el resumen anual lo cuenta. Se puede reabrir (admin).`)) return;
+  const q = si ? sb.from('gastos_cierres').insert({ periodo: per, unidad, es_prueba: MODO_PRUEBA, cerrado_por: session.email })
+               : sb.from('gastos_cierres').delete().eq('periodo', per).eq('unidad', unidad).eq('es_prueba', MODO_PRUEBA);
+  const { error } = await q; if (error){ toast(error.message, 'error'); return; }
+  toast(si ? 'Mes cerrado' : 'Mes reabierto', 'success'); await renderPlanilla();
+}
+
+// ── ✍️ Manuales ──
+async function guardarManual(){
+  const g = id => document.getElementById(id);
+  const row = { periodo: perSel('g-mes','g-anio'), unidad: g('g-unidad').value, categoria: g('g-cat').value, descripcion: g('g-desc').value.trim(),
+    tipo: g('g-tipo').value, numero: g('g-num').value || null, importe: Number(g('g-imp').value || 0), notas: g('g-notas').value || null,
+    es_prueba: MODO_PRUEBA, cargado_por: session.email, ok: true };
+  if (!row.descripcion){ toast('Falta la descripción', 'error'); return; }
+  if (!row.importe){ toast('Falta el importe', 'error'); return; }
+  const { error } = await sb.from('gastos_manual').insert(row);
+  if (error){ toast(error.message, 'error'); return; }
+  toast('Cargado', 'success'); limpiarManual(); await renderManuales();
+}
+function limpiarManual(){ for (const id of ['g-desc','g-num','g-imp','g-notas']) document.getElementById(id).value = ''; }
+async function renderManuales(){
+  const { data } = await sb.from('gastos_manual').select('*').eq('es_prueba', MODO_PRUEBA).order('periodo', { ascending: false }).order('id', { ascending: false }).limit(300);
+  const R = data || [];
+  if (!R.length){ document.getElementById('g-lista').innerHTML = '<div class="empty">Nada cargado a mano todavía.</div>'; return; }
+  let h = '<table><tr><th>Período</th><th>Unidad</th><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>N°</th><th class="num">Importe</th><th></th></tr>';
+  for (const r of R) h += `<tr><td>${MESES[Number(r.periodo.slice(5,7))-1].slice(0,3)} ${r.periodo.slice(0,4)}</td><td>${esc(uniNombre(r.unidad))}</td><td>${esc(catNombre(r.categoria))}</td><td>${esc(r.descripcion)}</td><td>${esc(r.tipo)}</td><td class="mini">${esc(r.numero || '')}</td><td class="num">${plata(r.importe)}</td><td><button class="btn" onclick="borrarManual(${r.id})">🗑</button></td></tr>`;
+  document.getElementById('g-lista').innerHTML = h + '</table>';
+}
+async function borrarManual(id){
+  if (!confirm('¿Borrar este renglón?')) return;
+  const { error } = await sb.from('gastos_manual').delete().eq('id', id);
+  if (error){ toast(error.message, 'error'); return; }
+  toast('Borrado'); await renderManuales(); await renderPlanilla();
+}
+
+// ── 🛍 Bolsas ──
+async function guardarBolsa(){
+  const g = id => document.getElementById(id);
+  const row = { anio: Number(g('b-anio').value), fecha: g('b-fecha').value || null, proveedor: g('b-prov').value.trim() || null, comprobante: g('b-comp').value.trim() || null,
+    importe: Number(g('b-imp').value || 0), es_prueba: MODO_PRUEBA, cargado_por: session.email };
+  if (!row.importe){ toast('Falta el importe', 'error'); return; }
+  const { error } = await sb.from('gastos_bolsas').insert(row); if (error){ toast(error.message, 'error'); return; }
+  toast('Agregada', 'success'); for (const id of ['b-fecha','b-prov','b-comp','b-imp']) g(id).value = ''; await renderBolsas();
+}
+async function renderBolsas(){
+  const anio = Number(document.getElementById('b-anio').value);
+  const { data } = await sb.from('gastos_bolsas').select('*').eq('es_prueba', MODO_PRUEBA).eq('anio', anio).order('fecha');
+  const R = data || []; const tot = R.reduce((a, r) => a + Number(r.importe), 0);
+  let h = `<h3>Bolsas ${anio} · total ${plata(tot)}</h3>`;
+  if (!R.length){ document.getElementById('b-lista').innerHTML = h + '<div class="empty">Sin facturas de bolsas este año.</div>'; return; }
+  h += '<table><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="num">Importe</th><th></th></tr>';
+  for (const r of R) h += `<tr><td>${r.fecha || ''}</td><td>${esc(r.proveedor || '')}</td><td>${esc(r.comprobante || '')}</td><td class="num">${plata(r.importe)}</td><td><button class="btn" onclick="borrarBolsa(${r.id})">🗑</button></td></tr>`;
+  document.getElementById('b-lista').innerHTML = h + '</table>';
+}
+async function borrarBolsa(id){ if (!confirm('¿Borrar?')) return; await sb.from('gastos_bolsas').delete().eq('id', id); await renderBolsas(); }
+
+// ── 📊 Resumen anual ──
+async function renderResumen(){
+  const anio = Number(document.getElementById('r-anio').value); const todo = document.getElementById('r-todo').checked;
+  document.getElementById('r-body').innerHTML = '<div class="empty">Sumando el año… (arma 12 meses, puede tardar unos segundos)</div>';
+  const { data, error } = await sb.rpc('gastos_resumen_anual', { p_anio: anio, p_prueba: MODO_PRUEBA, p_todo: todo });
+  if (error){ document.getElementById('r-body').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
+  const R = data || [];
+  if (!R.length){ document.getElementById('r-body').innerHTML = '<div class="empty">Sin meses cerrados. Tildá "incluir meses sin cerrar" para ver lo que hay.</div>'; return; }
+  const cerrados = new Set(R.filter(r => r.cerrado).map(r => r.unidad + '|' + r.mes));
+  let h = '<table><tr><th>Unidad / Categoría</th>' + MESES.map(m => `<th class="num">${m.slice(0,3)}</th>`).join('') + '<th class="num">Total</th></tr>';
+  let granTotal = 0; const totMes = Array(13).fill(0);
+  for (const u of UNIDADES){
+    const ru = R.filter(r => r.unidad === u.clave); if (!ru.length) continue;
+    const porMes = Array(13).fill(0); ru.forEach(r => porMes[r.mes] += Number(r.importe));
+    const tu = porMes.reduce((a, b) => a + b, 0); granTotal += tu; porMes.forEach((v, i) => totMes[i] += v);
+    h += `<tr class="nivel1"><td>${esc(u.nombre)}</td>${porMes.slice(1).map((v, i) => `<td class="num" title="${cerrados.has(u.clave + '|' + (i+1)) ? 'cerrado' : 'sin cerrar'}">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(tu)}</td></tr>`;
+    for (const c of CATS){
+      const rc = ru.filter(r => r.categoria === c.clave); if (!rc.length) continue;
+      const pm = Array(13).fill(0); rc.forEach(r => pm[r.mes] += Number(r.importe));
+      h += `<tr><td style="padding-left:24px">${esc(c.nombre)}</td>${pm.slice(1).map(v => `<td class="num">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(pm.reduce((a,b)=>a+b,0))}</td></tr>`;
+    }
+  }
+  h += `<tr class="nivel1"><td>TOTAL</td>${totMes.slice(1).map(v => `<td class="num">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(granTotal)}</td></tr></table>`;
+  document.getElementById('r-body').innerHTML = h;
+  document.getElementById('r-stat').innerHTML = `Año ${anio}: <strong>${plata(granTotal)}</strong>`;
+}
+
+</script>
+<script src="manual.js?v=1"></script>
+</body>
+</html>
