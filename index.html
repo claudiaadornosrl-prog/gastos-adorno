@@ -306,7 +306,9 @@ async function renderPlanilla(){
       html += `<tr class="nivel2"><td colspan="5" style="padding-left:28px">${esc(c.nombre)}</td><td class="num">${plata(tc)}</td></tr>`;
       for (const r of rc){
         const fuente = {compras:'📄', compras_linea:'📄', rrhh:'👥', impuestos:'🏛', manual:'✍️', bolsas:'🛍'}[r.fuente] || '';
-        const link = r.fuente === 'compras' ? `<a href="https://claudiaadornosrl-prog.github.io/compras-adorno/?doc=${r.ref_id}" target="_blank" title="Abrir en Compras" style="text-decoration:none">📄</a>` : fuente;
+        // (25-sep, JP) el 📄 abre el PDF de la factura en OneDrive, no el comprobante en Compras
+        const link = r.archivo ? `<a href="${_pdfUrl(r.archivo)}" target="_blank" title="Ver PDF de la factura" style="text-decoration:none">📄</a>`
+                   : (r.fuente === 'compras' || r.fuente === 'compras_linea') ? `<span title="La factura no tiene PDF vinculado" style="opacity:.4">📄</span>` : fuente;
         const accion = r.fuente === 'manual' ? `<button class="btn" onclick="borrarManual(${r.ref_id})" title="Borrar">🗑</button>` : '';
         html += `<tr class="${r.ok ? '' : 'dim'}"><td style="padding-left:44px">${link} ${esc(r.descripcion)}</td><td>${esc(r.tipo || '')}</td><td class="mini">${esc(r.numero || '')}</td>
           <td class="mini" title="${esc(r.detalle || '')}">${esc((r.detalle || '').slice(0, 60))}${(r.detalle || '').length > 60 ? '…' : ''}</td><td>${accion}</td><td class="num">${plata(r.importe)}</td></tr>`;
@@ -316,6 +318,13 @@ async function renderPlanilla(){
   }
   document.getElementById('p-body').innerHTML = html;
   document.getElementById('p-stat').innerHTML = `Total del mes: <strong>${plata(total)}</strong> · ${R.length} renglones`;
+}
+// ── PDF de la factura en OneDrive (misma base que Compras/_pdfUrl y tesoreria_path_a_weburl) ──
+const ONEDRIVE_BASE = 'https://claudiaadorno-my.sharepoint.com/personal/office_claudiaadorno_onmicrosoft_com/Documents/';
+function _pdfUrl(path){
+  if (!path) return '#';
+  if (/^https?:\/\//i.test(path)) return path;
+  return ONEDRIVE_BASE + String(path).split('/').map(encodeURIComponent).join('/');
 }
 async function cerrar(unidad, si){
   const per = perSel('p-mes','p-anio');
@@ -403,6 +412,6 @@ async function renderResumen(){
 }
 
 </script>
-<script src="manual.js?v=1"></script>
+<script src="manual.js?v=2"></script>
 </body>
 </html>

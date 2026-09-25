@@ -22,7 +22,7 @@ function _manualSecciones() {
       icon: '📒', titulo: 'Planilla · de dónde sale cada renglón',
       desc: 'Es la misma pirámide de siempre: Unidad → Categoría → renglón. La diferencia es que casi nada se tipea: el módulo la ARMA cada vez que la abrís.',
       pasos: [
-        '📄 Facturas: entran solas desde Compras cuando al contabilizar se tildó "Va a la planilla de gastos". Traen período (mes de consumo), unidad, categoría e importe. Si algo está mal, se corrige en Compras (✏ desde 📄 Facturas), no acá.',
+        '📄 Facturas: entran solas desde Compras cuando al contabilizar se tildó "Va a la planilla de gastos". Traen período (mes de consumo), unidad, categoría e importe. Tocando el 📄 del renglón se abre el PDF de la factura. Si algo está mal, se corrige en Compras (✏ desde 📄 Comprobantes), no acá.',
         '👥 Sueldos Banco / Sueldos (GNC) / Honorarios: salen de RRHH por local y período. Administración = Directora + JP.',
         '🏛 IIBB, cargas sociales, impuesto al débito/crédito: salen del módulo Impuestos, ya repartidos por unidad con su regla.',
         '✍️ Lo cargado a mano en la pestaña "A mano" (resúmenes de tarjetas, banco, GNC sin comprobante).',
