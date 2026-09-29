@@ -210,7 +210,22 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { p
   var inOrig = sb.auth.signInWithPassword.bind(sb.auth);
   sb.auth.signInWithPassword = async function (cred) { var r = await inOrig(cred); if (!r.error && r.data && r.data.user) ADORNO_SSO.recordar(mod, r.data.user.email); return r; };
   var outOrig = sb.auth.signOut.bind(sb.auth);
-  sb.auth.signOut = async function () { ADORNO_SSO.olvidarModulos(); return outOrig.apply(null, arguments); };
+  sb.auth.signOut = async function () {
+    ADORNO_SSO.olvidarModulos();
+    // Salir cierra SOLO este equipo (scope local), no el usuario en todas las PCs.
+    window.__adornoSaliendo = true;
+    return outOrig(arguments[0] || { scope: 'local' });
+  };
+  // Si la sesión se cae sola, avisar y volver al login.
+  var _tuvoSesion = false;
+  sb.auth.onAuthStateChange(function (ev, s) {
+    if (s) { _tuvoSesion = true; return; }
+    if (ev === 'SIGNED_OUT' && _tuvoSesion && !window.__adornoSaliendo) {
+      _tuvoSesion = false;
+      alert('Tu sesión se cerró (venció o alguien salió con este usuario).\nVolvé a ingresar: lo que no guardaste hay que cargarlo de nuevo.');
+      location.reload();
+    }
+  });
 })(MODULO);
 
 // 🧪 AMBIENTE DE PRUEBA: mismo interruptor que Compras (constante). true = solo comprobantes de test.
@@ -243,7 +258,7 @@ async function doLogin() {
 }
 async function entrar(user) {
   const { data: ok } = await sb.rpc('gastos_es_usuario');
-  if (!ok) { await sb.auth.signOut(); document.getElementById('login-error').textContent = 'Tu usuario no tiene acceso a este módulo.'; return; }
+  if (!ok) { /* sin signOut: sesión compartida (SSO) */ document.getElementById('login-error').textContent = 'Tu usuario no tiene acceso a este módulo.'; return; }
   session = { email: user.email, user };
   document.getElementById('user-info').textContent = user.email;
   document.getElementById('login').style.display = 'none';
