@@ -1,5 +1,5 @@
 // Service Worker · network-first para HTML, cache-first para assets
-const CACHE_VERSION = 'gastos-v4-lupa-manual';
+const CACHE_VERSION = 'gastos-v5-miles-en-vivo';
 const CACHE_ASSETS = ['fonts/URWGothic-Book.ttf', './', './index.html', './manual.js', './manifest.webmanifest'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_VERSION).then(c => c.addAll(CACHE_ASSETS)).catch(err => console.warn('[SW]', err)));
