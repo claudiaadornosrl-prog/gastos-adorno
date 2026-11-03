@@ -15,6 +15,7 @@ function _manualSecciones() {
       desc: 'La sesión se comparte entre todos los módulos del sistema.',
       pasos: [
         'En el Hub, con el ícono 👤, ingresás con tu usuario y podés tildar "Confiar en esta computadora": después entrás a todos los módulos sin volver a escribir la clave.',
+        'Código del celular (doble factor): si sos admin o directora y lo activaste en el Hub (panel de sesión, "Código del celular al entrar"), después de la clave te pide el código de 6 números de la app de autenticación del celular (Google o Microsoft Authenticator); cambia cada 30 segundos. Si cambiás o perdés el celular, avisale a JP para darlo de baja.',
         'Al salir de cualquier módulo se cierra la sesión en todos.',
       ],
     },
