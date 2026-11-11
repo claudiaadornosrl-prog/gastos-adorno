@@ -481,7 +481,8 @@ window.ADORNO_SSO = (function () {
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#7C7650">
+<link rel="stylesheet" href="/hub/banner.css?v=2"><!-- banner común de los módulos (infra, 11-nov-2026) -->
 <title>📒 Gastos · Claudia Adorno</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
@@ -557,19 +558,24 @@ tr.dim { color: var(--muted); }
 </div>
 <div id="app">
   <div id="franja-prueba" class="prueba" style="display:none">🧪 MODO PRUEBA · solo se ven los comprobantes de test</div>
-  <header>
-    <a class="hbtn" href="https://claudiaadornosrl-prog.github.io/hub/" title="Volver al Hub" aria-label="Volver al Hub" style="display:inline-flex;align-items:center;justify-content:center;height:34px;min-width:34px;padding:0 7px;border-radius:9px;text-decoration:none;color:inherit;opacity:.9;"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
-    <h1>📒 Gastos · Claudia Adorno</h1>
-    <div class="spacer"></div>
-    <div class="user-info" id="user-info"></div>
-    <button class="logout" onclick="doLogout()">Salir</button>
+  <!-- (11-nov-2026, infra) banner común de los módulos: /hub/banner.css + /hub/banner.js (moneda, colores del Hub, ☰).
+       Los apartados (antes una barra blanca abajo, con emojis) pasaron adentro del banner. -->
+  <header class="ab-banner" data-modulo="gastos">
+    <h1 class="ab-nombre">Gastos</h1>
+    <div class="user-info" id="user-info" style="display:none"></div>
+    <nav class="tabs ab-tabs" id="tabs">
+      <button id="tab-planilla" class="active" onclick="switchTab('planilla')" title="Planilla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="lb">Planilla</span></button>
+      <button id="tab-manual" class="" onclick="switchTab('manual')" title="A mano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span class="lb">A mano</span></button>
+      <button id="tab-bolsas" class="" onclick="switchTab('bolsas')" title="Bolsas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="lb">Bolsas</span></button>
+      <button id="tab-resumen" class="" onclick="switchTab('resumen')" title="Año"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><span class="lb">Año</span></button>
+    </nav>
+    <div class="ab-der">
+      <span class="hsep"></span>
+      <a class="hbtn ab-fijo" href="https://claudiaadornosrl-prog.github.io/hub/" title="Volver al Hub" aria-label="Volver al Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="lb">Hub</span></a>
+      <button class="hbtn ab-fijo" onclick="doLogout()" title="Salir" aria-label="Salir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="lb">Salir</span></button>
+    </div>
   </header>
-  <nav class="tabs" id="tabs">
-    <button id="tab-planilla" class="active" onclick="switchTab('planilla')">📒 Planilla</button>
-    <button id="tab-manual" class="" onclick="switchTab('manual')">✍️ A mano</button>
-    <button id="tab-bolsas" class="" onclick="switchTab('bolsas')">🛍 Bolsas</button>
-    <button id="tab-resumen" class="" onclick="switchTab('resumen')">📊 Año</button>
-  </nav>
+  <script src="/hub/banner.js?v=3"></script>
   <main>
 
     <section id="content-planilla" class="tab-content active">
@@ -857,6 +863,6 @@ async function renderResumen(){
 }
 
 </script>
-<script src="manual.js?v=7"></script>
+<script src="manual.js?v=8"></script>
 </body>
 </html>

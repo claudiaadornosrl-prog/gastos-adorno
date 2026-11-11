@@ -10,6 +10,8 @@ function _mEsc(s) {
 
 function _manualSecciones() {
   return [
+    { icon: '🧭', titulo: 'La barra de arriba', desc: 'Es igual en todos los módulos: mismo lugar para cada cosa y el color de la moneda del módulo (el mismo del Hub).',
+      pasos: ['A la izquierda, la moneda y el nombre del módulo. En la computadora, tocando el nombre (Gastos ▾) se abre la lista para pasar a otro módulo sin volver al Hub.', 'Al lado van los apartados (Planilla, A mano, Bolsas, Año): son íconos; al pasar el mouse aparece el nombre, y el apartado en el que estás queda marcado en blanco con su nombre.', 'A la derecha: 📖 Manual; después de la rayita, 🏠 Hub (volver al Hub) y Salir.', 'En el celular: los apartados y el Manual están adentro del botón ☰; a la vista quedan 🏠 Hub y Salir.'] },
     {
       icon: '🔐', titulo: 'Entrar una sola vez',
       desc: 'La sesión se comparte entre todos los módulos del sistema.',
@@ -122,7 +124,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarManual
   const nav = document.querySelector('nav.tabs');
   if (nav) {
     const b = document.createElement('button');
-    b.textContent = '📖 Manual';
+    b.title = 'Manual';   // (11-nov, banner común) ícono + nombre al pasar el mouse; banner.js lo pasa a la derecha
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="lb">Manual</span>';
     b.onclick = () => abrirManual();
     nav.appendChild(b);
   }
