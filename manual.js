@@ -11,7 +11,7 @@ function _mEsc(s) {
 function _manualSecciones() {
   return [
     { icon: '🧭', titulo: 'La barra de arriba', desc: 'Es igual en todos los módulos: mismo lugar para cada cosa y el color de la moneda del módulo (el mismo del Hub).',
-      pasos: ['A la izquierda, la moneda y el nombre del módulo. En la computadora, tocando el nombre (Gastos ▾) se abre la lista para pasar a otro módulo sin volver al Hub.', 'Al lado van los apartados (Planilla, A mano, Bolsas, Año): son íconos; al pasar el mouse aparece el nombre, y el apartado en el que estás queda marcado en blanco con su nombre.', 'A la derecha: 📖 Manual; después de la rayita, 🏠 Hub (volver al Hub) y Salir.', 'En el celular: los apartados y el Manual están adentro del botón ☰; a la vista quedan 🏠 Hub y Salir.'] },
+      pasos: ['A la izquierda, la moneda y el nombre del módulo. En la computadora, tocando el nombre (Gastos ▾) se abre la lista para pasar a otro módulo; al final de esa lista está «Volver al Hub».', 'Al lado van los apartados (Planilla, A mano, Bolsas, Año): son íconos; al pasar el mouse aparece el nombre, y el apartado en el que estás queda marcado en blanco con su nombre.', 'A la derecha: Salir.', 'En el celular: los apartados están adentro del botón ☰; a la vista quedan 🏠 Hub (volver al Hub) y Salir.', '¿Dudas? Preguntale a Clodi (el botón de abajo a la derecha): sabe todo lo que dice este manual.'] },
     {
       icon: '🔐', titulo: 'Entrar una sola vez',
       desc: 'La sesión se comparte entre todos los módulos del sistema.',
