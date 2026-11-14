@@ -541,6 +541,15 @@ tr.dim { color: var(--muted); }
 #ov .box { background: white; border-radius: 12px; padding: 18px; max-width: 720px; width: 100%; max-height: 90vh; overflow: auto; }
 @media (max-width: 600px) { main { padding: 10px; } th, td { padding: 8px 8px; font-size: 13px; } header h1 { font-size: 16px; } }
 .hbtn:hover{background:rgba(255,255,255,.18);opacity:1}
+/* (13-nov-2026) ventana para pedir autorización (permisos por función del Hub) */
+#sup-login { position: fixed; inset: 0; background: rgba(28,22,18,.45); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+#sup-login .sup-box { background: #fff; border-radius: 22px; padding: 20px 20px 16px; max-width: 400px; width: 100%; box-shadow: 0 24px 50px -16px rgba(28,22,18,.45); }
+#sup-login .sup-tit { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+#sup-login .sup-txt { font-size: 13px; color: #64748b; line-height: 1.45; margin-bottom: 12px; }
+#sup-login input { width: 100%; box-sizing: border-box; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 14px; font-family: inherit; }
+#sup-login .sup-err { color: #dc2626; font-size: 12.5px; min-height: 16px; margin: 2px 0 6px; }
+#sup-login .sup-pie { display: flex; justify-content: flex-end; gap: 8px; }
+#sup-login .btn { border-radius: 999px; padding: 8px 16px; }
 </style>
 </head>
 <body>
@@ -635,6 +644,7 @@ tr.dim { color: var(--muted); }
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
 <script src="/hub/seguridad.js?v=1"></script>
+<script src="/hub/caras.js?v=4" defer></script><!-- 📷 registra quién hizo cada función (Hub → Permisos) -->
 <script>
 const SUPABASE_URL  = 'https://jfwtiagteuwmyvblgwms.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_udSPma98Sw9eskeeLCgdCw_S2vIX0Fk';
@@ -711,6 +721,122 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-wo
 
 
 let UNIDADES = [], CATS = [], esAdmin = false;
+const FUNCIONES = {   // ids de hub_funciones (Hub → Permisos) y cómo se nombran en los avisos
+  'gastos.ver_planilla': 'ver la planilla del mes (sueldos incluidos)',
+  'gastos.cargar_manual': 'cargar a mano un gasto sin factura',
+  'gastos.borrar_manual': 'borrar renglones cargados a mano',
+  'gastos.bolsas': 'cargar y borrar facturas de bolsas',
+  'gastos.ver_pdf': 'abrir el PDF de la factura',
+  'gastos.resumen_anual': 'ver el resumen del año',
+  'gastos.cerrar_mes': 'cerrar el mes de un local',
+  'gastos.reabrir_mes': 'reabrir un mes cerrado',
+};
+const PESTANAS = {   // un apartado se ve si alguna de sus funciones no está oculta
+  planilla: () => ve('gastos.ver_planilla'),
+  manual: () => ve('gastos.cargar_manual') || ve('gastos.borrar_manual'),
+  bolsas: () => ve('gastos.bolsas'),
+  resumen: () => ve('gastos.resumen_anual'),
+};
+function aplicarPestanas() {
+  for (const [k, f] of Object.entries(PESTANAS)) { const b = document.getElementById('tab-' + k); if (b) b.style.display = f() ? '' : 'none'; }
+  const form = document.querySelector('#content-manual .card'); if (form) form.style.display = ve('gastos.cargar_manual') ? '' : 'none';
+}
+const primeraPestana = () => Object.keys(PESTANAS).find(k => PESTANAS[k]());
+// el 📄 de la planilla: con "pide permiso" se autoriza una vez y después abre directo
+function abrirPdf(ev, href) {
+  if (permiso('gastos.ver_pdf') === 'h' || VISTO.has('gastos.ver_pdf')) return true;
+  ev.preventDefault(); puedeVer('gastos.ver_pdf').then(ok => { if (ok) window.open(href, '_blank', 'noopener'); }); return false;
+}
+// ═══ PERMISOS POR FUNCIÓN (13-nov-2026, JP desde el Hub → ícono de persona → Permisos) ═════════════════════
+// hub_puedo('<id>') con la sesión de quien usa la pantalla: 'h' habilitada · 'a' pide permiso · 'o' oculta (admin: 'h').
+// · 'o': el botón o el apartado no se muestra.
+// · 'a': se ve; al usarla pide el usuario y la clave de quien autoriza (cliente aparte que no guarda sesión, marcado
+//   data-adorno-superior para la traba de equipo). Autoriza quien, con SU sesión, pasa hub_autoriza: admin, o una persona
+//   con legajo y la función habilitada; las cuentas genéricas (locales y oficina) nunca autorizan. Lo que graba
+//   se hace con la sesión de quien autorizó (la base también chequea hub_puedo) y queda su mail. Para MIRAR alcanza con
+//   autorizar una vez: vale hasta recargar la página.
+let PERM = {};
+const VISTO = new Set();
+async function cargarPermisos() {
+  const ids = Object.keys(FUNCIONES);
+  const rs = await Promise.all(ids.map(f => sb.rpc('hub_puedo', { p_funcion: f })));
+  ids.forEach((f, i) => { PERM[f] = rs[i].error ? 'o' : (rs[i].data || 'o'); });
+}
+const permiso = f => PERM[f] || 'o';
+const ve = f => permiso(f) !== 'o';
+// Cliente con el que hacer la operación: sb si está habilitada, el de quien autorizó si pide permiso, null si no.
+async function clientePara(f) {
+  const p = permiso(f);
+  if (p === 'h') return sb;
+  if (p !== 'a') { toast('Tu perfil no tiene habilitado ' + (FUNCIONES[f] || f) + '.', 'error'); return null; }
+  return pedirSuperior(f);
+}
+async function soltar(db) { if (db && db !== sb) { try { await db.auth.signOut({ scope: 'local' }); } catch (e) {} } }
+const quienCarga = db => db && db._sup ? `${session.email} (autorizó ${db._sup})` : session.email;
+// ═══ 📷 REGISTRA QUIÉN (14-nov-2026, JP: «poner a cada función si necesita o no grabar quién la hizo») ═══════════════
+// Si JP marcó la función con «📷 Registra quién» (Hub → Permisos), antes de grabar se anota en hub_registros quién la
+// está haciendo (/hub/caras.js): con usuario personal, solo; con la cuenta de la oficina, por la cara (si la llave de
+// caras está prendida) o tocando su nombre en la lista. Va DESPUÉS de clientePara y siempre con la sesión de esta
+// pantalla (sb), nunca con la de quien autorizó. false = no hacer la operación (cerró la ventana o no se pudo anotar).
+async function anotarQuien(f, detalle) {
+  detalle = Object.assign({}, detalle, MODO_PRUEBA ? { prueba: true } : {});
+  if (!window.ADORNO_CARAS || !ADORNO_CARAS.registrar) {      // no cargó caras.js: si la función no registra, se sigue
+    const { data, error } = await sb.rpc('hub_registra_quien', { p_funcion: f });
+    if (!error && data && !data.registra) return true;
+    toast('No se pudo abrir el registro de quién lo hace. Recargá la página.', 'error'); return false;
+  }
+  const r = await ADORNO_CARAS.registrar({ cli: sb, funcion: f, local: 'oficina', detalle: detalle || null });
+  if (!r.ok) { if (r.motivo === 'error') toast('No se pudo anotar quién lo hace: ' + (r.error || ''), 'error'); return false; }
+  return true;
+}
+let MANUALES = new Map(), BOLSAS = new Map();   // lo que está en pantalla, para el detalle del registro al borrar
+async function puedeVer(...fs) {
+  if (fs.some(f => permiso(f) === 'h' || VISTO.has(f))) return true;
+  const f = fs.find(x => permiso(x) === 'a'); if (!f) return false;
+  const db = await pedirSuperior(f); if (!db) return false;
+  VISTO.add(f); soltar(db); return true;
+}
+function bloqueo(id, f, reintento) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = `<div class="empty">Para ${esc(FUNCIONES[f] || f)} hace falta la autorización de alguien que tenga ese permiso.<br><br><button class="btn primary" style="border-radius:999px" onclick="${reintento}">Pedir autorización</button></div>`;
+}
+function pedirSuperior(f) {
+  return new Promise(listo => {
+    const viejo = document.getElementById('sup-login'); if (viejo) viejo.remove();
+    const d = document.createElement('div'); d.id = 'sup-login'; d.setAttribute('data-adorno-superior', '1');
+    d.innerHTML = `<div class="sup-box" role="dialog" aria-modal="true">
+      <div class="sup-tit">Pedir autorización</div>
+      <div class="sup-txt">Para <b>${esc(FUNCIONES[f] || f)}</b> tiene que autorizar alguien que tenga ese permiso, con <b>su usuario personal</b> (por ejemplo, administración). Las cuentas de los locales y de la oficina no autorizan. No queda abierto en esta computadora.</div>
+      <input id="sup-mail" type="email" placeholder="usuario (mail) de quien autoriza" autocomplete="off">
+      <input id="sup-clave" type="password" placeholder="su clave" autocomplete="new-password">
+      <div id="sup-err" class="sup-err"></div>
+      <div class="sup-pie"><button class="btn" id="sup-no">Cancelar</button><button class="btn primary" id="sup-si">Autorizar</button></div></div>`;
+    document.body.appendChild(d);
+    const q = id => d.querySelector('#' + id), err = q('sup-err'), si = q('sup-si');
+    const fin = v => { d.remove(); listo(v); };
+    q('sup-no').onclick = () => fin(null);
+    q('sup-clave').addEventListener('keydown', e => { if (e.key === 'Enter') si.click(); });
+    d.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); fin(null); } });
+    setTimeout(() => q('sup-mail').focus(), 50);
+    si.onclick = async () => {
+      const em = (q('sup-mail').value || '').trim().toLowerCase(), pw = q('sup-clave').value || '';
+      err.textContent = '';
+      if (!em || !pw) { err.textContent = 'Completá el mail y la clave.'; return; }
+      if (session && em === String(session.email || '').toLowerCase()) { err.textContent = 'Tiene que ser el usuario de quien autoriza, no el de esta cuenta.'; return; }
+      si.disabled = true; si.textContent = 'Autorizando…';
+      const cli = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'adorno-' + MODULO + '-superior' } });
+      const salir = async () => { try { await cli.auth.signOut({ scope: 'local' }); } catch (x) {} };
+      try {
+        const r = await cli.auth.signInWithPassword({ email: em, password: pw });
+        if (r.error) throw new Error('Mail o clave incorrectos.');
+        if (window.ADORNO_MFA && ADORNO_MFA.pedirCodigo && !(await ADORNO_MFA.pedirCodigo(cli))) { await salir(); throw new Error('Sin el código del celular no se puede autorizar.'); }
+        const { data: ok, error: e1 } = await cli.rpc('hub_autoriza', { p_funcion: f });   // admin, o persona con legajo y la función habilitada
+        if (e1 || ok !== true) { await salir(); throw new Error('Ese usuario no puede autorizar ' + (FUNCIONES[f] || f) + ': tiene que ser una persona (no la cuenta del local ni de la oficina) con esa función habilitada.'); }
+        cli._sup = em; toast('Autorizó ' + em, 'success'); fin(cli);
+      } catch (e) { err.textContent = e.message || 'No se pudo autorizar.'; si.disabled = false; si.textContent = 'Autorizar'; }
+    };
+  });
+}
 const uniNombre = k => (UNIDADES.find(u => u.clave === k) || {}).nombre || k || '—';
 const catNombre = k => (CATS.find(c => c.clave === k) || {}).nombre || k || '—';
 async function init(){
@@ -719,13 +845,16 @@ async function init(){
     sb.from('gastos_categorias').select('*').eq('activo', true).order('orden'),
     sb.rpc('rrhh_is_admin')]);
   UNIDADES = u.data || []; CATS = c.data || []; esAdmin = !!a.data;
+  await cargarPermisos(); aplicarPestanas();
   const hoy = hoyAR(); const y = Number(hoy.slice(0,4)), m = Number(hoy.slice(5,7));
   for (const id of ['p-mes','g-mes']) document.getElementById(id).innerHTML = MESES.map((x,i) => `<option value="${i+1}" ${i+1===m?'selected':''}>${x}</option>`).join('');
   for (const id of ['p-anio','g-anio','b-anio','r-anio']) document.getElementById(id).innerHTML = [y-1,y,y+1].map(v => `<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
   document.getElementById('p-unidad').innerHTML += UNIDADES.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
   document.getElementById('g-unidad').innerHTML = UNIDADES.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
   document.getElementById('g-cat').innerHTML = CATS.map(x => `<option value="${x.clave}">${esc(x.nombre)}</option>`).join('');
-  await renderPlanilla();
+  const primera = primeraPestana();
+  if (!primera) { document.querySelector('main').innerHTML = '<div class="empty">Tu perfil no tiene funciones de Gastos habilitadas. Pedíselas a administración (Hub → Permisos).</div>'; return; }
+  if (primera === 'planilla') await renderPlanilla(); else switchTab(primera);
 }
 function onTab(k){ if (k === 'manual') renderManuales(); if (k === 'bolsas') renderBolsas(); if (k === 'resumen') renderResumen(); }
 const perSel = (pm, pa) => `${document.getElementById(pa).value}-${String(document.getElementById(pm).value).padStart(2,'0')}-01`;
@@ -734,6 +863,7 @@ const perSel = (pm, pa) => `${document.getElementById(pa).value}-${String(docume
 let CIERRES = [];
 async function renderPlanilla(){
   const per = perSel('p-mes','p-anio'); const fu = document.getElementById('p-unidad').value;
+  if (!(await puedeVer('gastos.ver_planilla'))) { document.getElementById('p-stat').textContent = ''; bloqueo('p-body', 'gastos.ver_planilla', 'renderPlanilla()'); return; }
   document.getElementById('p-body').innerHTML = '<div class="empty">Armando la planilla…</div>';
   const [{ data: rows, error }, { data: ci }] = await Promise.all([
     sb.rpc('gastos_planilla', { p_periodo: per, p_prueba: MODO_PRUEBA }),
@@ -748,8 +878,8 @@ async function renderPlanilla(){
     const tu = ru.reduce((a, r) => a + Number(r.importe || 0), 0); total += tu;
     const cerrado = CIERRES.some(c => c.unidad === u.clave);
     html += `<table style="margin-bottom:14px"><tr class="nivel1"><td colspan="5">${esc(u.nombre)}
-        ${cerrado ? `<span class="chip green" style="margin-left:8px">☑ Cerrado</span> ${esAdmin ? `<button class="btn" style="margin-left:6px" onclick="cerrar('${u.clave}', false)">Reabrir</button>` : ''}`
-                  : `<button class="btn" style="margin-left:8px" onclick="cerrar('${u.clave}', true)">Cerrar mes</button>`}</td>
+        ${cerrado ? `<span class="chip green" style="margin-left:8px">☑ Cerrado</span> ${ve('gastos.reabrir_mes') ? `<button class="btn" style="margin-left:6px" onclick="cerrar('${u.clave}', false)">Reabrir</button>` : ''}`
+                  : ve('gastos.cerrar_mes') ? `<button class="btn" style="margin-left:8px" onclick="cerrar('${u.clave}', true)">Cerrar mes</button>` : ''}</td>
       <td class="num">${plata(tu)}</td></tr>`;
     for (const c of CATS){
       const rc = ru.filter(r => r.categoria === c.clave); if (!rc.length) continue;
@@ -758,9 +888,9 @@ async function renderPlanilla(){
       for (const r of rc){
         const fuente = {compras:'📄', compras_linea:'📄', rrhh:'👥', impuestos:'🏛', manual:'✍️', bolsas:'🛍'}[r.fuente] || '';
         // (25-sep, JP) el 📄 abre el PDF de la factura en OneDrive, no el comprobante en Compras
-        const link = r.archivo ? `<a href="${_pdfUrl(r.archivo)}" target="_blank" title="Ver PDF de la factura" style="text-decoration:none">📄</a>`
+        const link = r.archivo ? (ve('gastos.ver_pdf') ? `<a href="${_pdfUrl(r.archivo)}" target="_blank" rel="noopener" title="Ver PDF de la factura" style="text-decoration:none" onclick="return abrirPdf(event, this.href)">📄</a>` : '📄')
                    : (r.fuente === 'compras' || r.fuente === 'compras_linea') ? `<span title="La factura no tiene PDF vinculado" style="opacity:.4">📄</span>` : fuente;
-        const accion = r.fuente === 'manual' ? `<button class="btn" onclick="borrarManual(${r.ref_id})" title="Borrar">🗑</button>` : '';
+        const accion = r.fuente === 'manual' && ve('gastos.borrar_manual') ? `<button class="btn" onclick="borrarManual(${r.ref_id})" title="Borrar">🗑</button>` : '';
         html += `<tr class="${r.ok ? '' : 'dim'}"><td style="padding-left:44px">${link} ${esc(r.descripcion)}</td><td>${esc(r.tipo || '')}</td><td class="mini">${esc(r.numero || '')}</td>
           <td class="mini" title="${esc(r.detalle || '')}">${esc((r.detalle || '').slice(0, 60))}${(r.detalle || '').length > 60 ? '…' : ''}</td><td>${accion}</td><td class="num">${plata(r.importe)}</td></tr>`;
       }
@@ -779,10 +909,13 @@ function _pdfUrl(path){
 }
 async function cerrar(unidad, si){
   const per = perSel('p-mes','p-anio');
-  if (si && !confirm(`¿Cerrar ${uniNombre(unidad)} de ${MESES[Number(per.slice(5,7))-1]}?\n\nRecién ahí el resumen anual lo cuenta. Se puede reabrir (admin).`)) return;
-  const q = si ? sb.from('gastos_cierres').insert({ periodo: per, unidad, es_prueba: MODO_PRUEBA, cerrado_por: session.email })
-               : sb.from('gastos_cierres').delete().eq('periodo', per).eq('unidad', unidad).eq('es_prueba', MODO_PRUEBA);
-  const { error } = await q; if (error){ toast(error.message, 'error'); return; }
+  if (si && !confirm(`¿Cerrar ${uniNombre(unidad)} de ${MESES[Number(per.slice(5,7))-1]}?\n\nRecién ahí el resumen anual lo cuenta. Lo puede reabrir quien tenga «Reabrir un mes cerrado».`)) return;
+  const fn = si ? 'gastos.cerrar_mes' : 'gastos.reabrir_mes';
+  const db = await clientePara(fn); if (!db) return;
+  if (!(await anotarQuien(fn, { periodo: per, unidad: uniNombre(unidad) }))) { soltar(db); return; }
+  const q = si ? db.from('gastos_cierres').insert({ periodo: per, unidad, es_prueba: MODO_PRUEBA, cerrado_por: quienCarga(db) })
+               : db.from('gastos_cierres').delete().eq('periodo', per).eq('unidad', unidad).eq('es_prueba', MODO_PRUEBA);
+  const { error } = await q; soltar(db); if (error){ toast(error.message, 'error'); return; }
   toast(si ? 'Mes cerrado' : 'Mes reabierto', 'success'); await renderPlanilla();
 }
 
@@ -794,22 +927,28 @@ async function guardarManual(){
     es_prueba: MODO_PRUEBA, cargado_por: session.email, ok: true };
   if (!row.descripcion){ toast('Falta la descripción', 'error'); return; }
   if (!row.importe){ toast('Falta el importe', 'error'); return; }
-  const { error } = await sb.from('gastos_manual').insert(row);
+  const db = await clientePara('gastos.cargar_manual'); if (!db) return;
+  if (!(await anotarQuien('gastos.cargar_manual', { periodo: row.periodo, unidad: uniNombre(row.unidad), categoria: catNombre(row.categoria), descripcion: row.descripcion, importe: row.importe }))) { soltar(db); return; }
+  row.cargado_por = quienCarga(db);
+  const { error } = await db.from('gastos_manual').insert(row); soltar(db);
   if (error){ toast(error.message, 'error'); return; }
   toast('Cargado', 'success'); limpiarManual(); await renderManuales();
 }
 function limpiarManual(){ for (const id of ['g-desc','g-num','g-imp','g-notas']) document.getElementById(id).value = ''; }
 async function renderManuales(){
   const { data } = await sb.from('gastos_manual').select('*').eq('es_prueba', MODO_PRUEBA).order('periodo', { ascending: false }).order('id', { ascending: false }).limit(300);
-  const R = data || [];
+  const R = data || []; MANUALES = new Map(R.map(r => [r.id, r]));
   if (!R.length){ document.getElementById('g-lista').innerHTML = '<div class="empty">Nada cargado a mano todavía.</div>'; return; }
   let h = '<table><tr><th>Período</th><th>Unidad</th><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>N°</th><th class="num">Importe</th><th></th></tr>';
-  for (const r of R) h += `<tr><td>${MESES[Number(r.periodo.slice(5,7))-1].slice(0,3)} ${r.periodo.slice(0,4)}</td><td>${esc(uniNombre(r.unidad))}</td><td>${esc(catNombre(r.categoria))}</td><td>${esc(r.descripcion)}</td><td>${esc(r.tipo)}</td><td class="mini">${esc(r.numero || '')}</td><td class="num">${plata(r.importe)}</td><td><button class="btn" onclick="borrarManual(${r.id})">🗑</button></td></tr>`;
+  for (const r of R) h += `<tr><td>${MESES[Number(r.periodo.slice(5,7))-1].slice(0,3)} ${r.periodo.slice(0,4)}</td><td>${esc(uniNombre(r.unidad))}</td><td>${esc(catNombre(r.categoria))}</td><td>${esc(r.descripcion)}</td><td>${esc(r.tipo)}</td><td class="mini">${esc(r.numero || '')}</td><td class="num">${plata(r.importe)}</td><td>${ve('gastos.borrar_manual') ? `<button class="btn" onclick="borrarManual(${r.id})">🗑</button>` : ''}</td></tr>`;
   document.getElementById('g-lista').innerHTML = h + '</table>';
 }
 async function borrarManual(id){
   if (!confirm('¿Borrar este renglón?')) return;
-  const { error } = await sb.from('gastos_manual').delete().eq('id', id);
+  const db = await clientePara('gastos.borrar_manual'); if (!db) return;
+  const m = MANUALES.get(id) || {};
+  if (!(await anotarQuien('gastos.borrar_manual', { id, periodo: m.periodo, unidad: uniNombre(m.unidad), descripcion: m.descripcion, importe: m.importe }))) { soltar(db); return; }
+  const { error } = await db.from('gastos_manual').delete().eq('id', id); soltar(db);
   if (error){ toast(error.message, 'error'); return; }
   toast('Borrado'); await renderManuales(); await renderPlanilla();
 }
@@ -820,24 +959,31 @@ async function guardarBolsa(){
   const row = { anio: Number(g('b-anio').value), fecha: g('b-fecha').value || null, proveedor: g('b-prov').value.trim() || null, comprobante: g('b-comp').value.trim() || null,
     importe: Number(g('b-imp').value || 0), es_prueba: MODO_PRUEBA, cargado_por: session.email };
   if (!row.importe){ toast('Falta el importe', 'error'); return; }
-  const { error } = await sb.from('gastos_bolsas').insert(row); if (error){ toast(error.message, 'error'); return; }
+  const db = await clientePara('gastos.bolsas'); if (!db) return;
+  if (!(await anotarQuien('gastos.bolsas', { accion: 'cargar', anio: row.anio, fecha: row.fecha, proveedor: row.proveedor, comprobante: row.comprobante, importe: row.importe }))) { soltar(db); return; }
+  row.cargado_por = quienCarga(db);
+  const { error } = await db.from('gastos_bolsas').insert(row); soltar(db); if (error){ toast(error.message, 'error'); return; }
   toast('Agregada', 'success'); for (const id of ['b-fecha','b-prov','b-comp','b-imp']) g(id).value = ''; await renderBolsas();
 }
 async function renderBolsas(){
   const anio = Number(document.getElementById('b-anio').value);
   const { data } = await sb.from('gastos_bolsas').select('*').eq('es_prueba', MODO_PRUEBA).eq('anio', anio).order('fecha');
-  const R = data || []; const tot = R.reduce((a, r) => a + Number(r.importe), 0);
+  const R = data || []; BOLSAS = new Map(R.map(r => [r.id, r])); const tot = R.reduce((a, r) => a + Number(r.importe), 0);
   let h = `<h3>Bolsas ${anio} · total ${plata(tot)}</h3>`;
   if (!R.length){ document.getElementById('b-lista').innerHTML = h + '<div class="empty">Sin facturas de bolsas este año.</div>'; return; }
   h += '<table><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="num">Importe</th><th></th></tr>';
-  for (const r of R) h += `<tr><td>${r.fecha || ''}</td><td>${esc(r.proveedor || '')}</td><td>${esc(r.comprobante || '')}</td><td class="num">${plata(r.importe)}</td><td><button class="btn" onclick="borrarBolsa(${r.id})">🗑</button></td></tr>`;
+  for (const r of R) h += `<tr><td>${r.fecha || ''}</td><td>${esc(r.proveedor || '')}</td><td>${esc(r.comprobante || '')}</td><td class="num">${plata(r.importe)}</td><td>${ve('gastos.bolsas') ? `<button class="btn" onclick="borrarBolsa(${r.id})">🗑</button>` : ''}</td></tr>`;
   document.getElementById('b-lista').innerHTML = h + '</table>';
 }
-async function borrarBolsa(id){ if (!confirm('¿Borrar?')) return; await sb.from('gastos_bolsas').delete().eq('id', id); await renderBolsas(); }
+async function borrarBolsa(id){ if (!confirm('¿Borrar?')) return; const db = await clientePara('gastos.bolsas'); if (!db) return;
+  const b = BOLSAS.get(id) || {};
+  if (!(await anotarQuien('gastos.bolsas', { accion: 'borrar', id, fecha: b.fecha, proveedor: b.proveedor, comprobante: b.comprobante, importe: b.importe }))) { soltar(db); return; }
+  const { error } = await db.from('gastos_bolsas').delete().eq('id', id); soltar(db); if (error){ toast(error.message, 'error'); return; } await renderBolsas(); }
 
 // ── 📊 Resumen anual ──
 async function renderResumen(){
   const anio = Number(document.getElementById('r-anio').value); const todo = document.getElementById('r-todo').checked;
+  if (!(await puedeVer('gastos.resumen_anual'))) { document.getElementById('r-stat').textContent = ''; bloqueo('r-body', 'gastos.resumen_anual', 'renderResumen()'); return; }
   document.getElementById('r-body').innerHTML = '<div class="empty">Sumando el año… (arma 12 meses, puede tardar unos segundos)</div>';
   const { data, error } = await sb.rpc('gastos_resumen_anual', { p_anio: anio, p_prueba: MODO_PRUEBA, p_todo: todo });
   if (error){ document.getElementById('r-body').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
@@ -863,6 +1009,6 @@ async function renderResumen(){
 }
 
 </script>
-<script src="manual.js?v=10"></script>
+<script src="manual.js?v=11"></script>
 </body>
 </html>

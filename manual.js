@@ -12,6 +12,8 @@ function _manualSecciones() {
   return [
     { icon: '🧭', titulo: 'La barra de arriba', desc: 'Es igual en todos los módulos: mismo lugar para cada cosa y el color de la moneda del módulo (el mismo del Hub).',
       pasos: ['A la izquierda, la moneda y el nombre del módulo. En la computadora, tocando el nombre (Gastos ▾) se abre la lista para pasar a otro módulo; al final de esa lista está «Volver al Hub».', 'Al lado van los apartados (Planilla, A mano, Bolsas, Año): son íconos; al pasar el mouse aparece el nombre, y el apartado en el que estás queda marcado en blanco con su nombre.', 'En el celular: los apartados están adentro del botón ☰; a la vista queda 🏠 Hub (volver al Hub).', 'Para cerrar la sesión: volvé al Hub y tocá 👤 (arriba) → Salir; se cierra en todos los módulos. En los módulos no hay botón de Salir.', '¿Dudas? Preguntale a Clodi (el botón de abajo a la derecha): sabe todo lo que dice este manual.'] },
+    { icon: '🔑', titulo: 'Permisos: qué puede hacer cada uno', desc: 'Lo maneja administración en el Hub (ícono de persona → Permisos): cada función de Gastos puede estar Habilitada, Pide permiso u Oculta para cada perfil.',
+      pasos: ['Las funciones: ver la planilla del mes (sueldos incluidos) · cargar a mano un gasto sin factura · borrar renglones cargados a mano · cargar y borrar facturas de bolsas · abrir el PDF de la factura (📄) · ver el resumen del año · cerrar el mes de un local · reabrir un mes cerrado.', 'Habilitada: se usa normal. Oculta: el botón o el apartado no aparece. Pide permiso: se ve, pero al usarlo se abre «Pedir autorización» y tiene que poner su usuario y su clave una persona que tenga esa función habilitada (hoy, administración). Las cuentas de los locales y de la oficina nunca autorizan. No queda abierto en esta computadora.', 'Para mirar alcanza con autorizar una vez: vale hasta que se recarga la página. Para grabar se pide cada vez, y queda anotado quién autorizó.', 'La base también lo controla: aunque alguien fuerce la pantalla, no se graba nada sin el permiso.', 'Si algo no aparece o pide autorización, es por el perfil: se cambia en el Hub, no acá.', '📷 Registra quién: si JP marcó una función con «📷 Registra quién» en el Hub, al usarla se pide quién la está haciendo (por la cara, o tocando tu nombre en la lista); con usuario personal se anota solo. Si además pide autorización, primero autoriza la otra persona y después se pregunta quién lo hace. Si cerrás esa ventana, no se hace. No se guarda ninguna foto: queda el nombre, la hora y qué se hizo, y JP lo ve en Hub → Permisos → Registro.'] },
     {
       icon: '🔐', titulo: 'Entrar una sola vez',
       desc: 'La sesión se comparte entre todos los módulos del sistema.',
@@ -39,7 +41,7 @@ function _manualSecciones() {
       desc: 'Es el H1 de la planilla vieja: hasta que una unidad no se cierra, el resumen anual no la cuenta.',
       pasos: [
         'Botón "Cerrar mes" al lado de cada unidad. Se cierra unidad por unidad, cuando está controlada.',
-        'Reabrir: solo el admin.',
+        'Reabrir: quien tenga la función «Reabrir un mes cerrado» (Hub → Permisos); hoy, administración.',
         'Un renglón en gris es una factura todavía no aprobada en Compras: aparece para que se vea, pero conviene cerrar recién cuando no quede ninguno.',
       ],
     },
