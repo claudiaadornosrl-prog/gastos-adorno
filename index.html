@@ -660,6 +660,7 @@ th { background: var(--gray-light); font-size: 12px; font-weight: 600; color: va
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.nivel1 td { background: var(--primary-bg); font-weight: 700; } tr.nivel2 td { background: #f8fafc; font-weight: 600; }
 tr.dim { color: var(--muted); }
+table.tt { overflow: clip; }   /* (19-nov) tablas tipo Excel: con overflow:hidden la tabla era su propia caja de scroll y los títulos fijos tapaban el primer renglón */
 .chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .chip.green { background: var(--green-bg); color: var(--green); } .chip.amber { background: var(--amber-bg); color: var(--amber); }
 .chip.red { background: var(--red-bg); color: var(--red); } .chip.gray { background: var(--gray-light); color: var(--muted); }
@@ -1021,14 +1022,14 @@ async function renderPlanilla(){
     const ru = R.filter(r => r.unidad === u.clave); if (!ru.length) continue;
     const tu = ru.reduce((a, r) => a + Number(r.importe || 0), 0); total += tu;
     const cerrado = CIERRES.some(c => c.unidad === u.clave);
-    html += `<table style="margin-bottom:14px"><tr class="nivel1"><td colspan="5">${esc(u.nombre)}
+    html += `<tbody><tr class="nivel1 tt-fija"><td colspan="5">${esc(u.nombre)}
         ${cerrado ? `<span class="chip green" style="margin-left:8px">☑ Cerrado</span> ${ve('gastos.reabrir_mes') ? `<button class="btn" style="margin-left:6px" onclick="cerrar('${u.clave}', false)">Reabrir</button>` : ''}`
                   : ve('gastos.cerrar_mes') ? `<button class="btn" style="margin-left:8px" onclick="cerrar('${u.clave}', true)">Cerrar mes</button>` : ''}</td>
-      <td class="num">${plata(tu)}</td></tr>`;
+      <td class="num">${plata(tu)}</td></tr></tbody>`;
     for (const c of CATS){
       const rc = ru.filter(r => r.categoria === c.clave); if (!rc.length) continue;
       const tc = rc.reduce((a, r) => a + Number(r.importe || 0), 0);
-      html += `<tr class="nivel2"><td colspan="5" style="padding-left:28px">${esc(c.nombre)}</td><td class="num">${plata(tc)}</td></tr>`;
+      html += `<tbody><tr class="nivel2 tt-fija"><td colspan="5" style="padding-left:28px">${esc(c.nombre)}</td><td class="num">${plata(tc)}</td></tr>`;
       for (const r of rc){
         const fuente = {compras:'📄', compras_linea:'📄', rrhh:'👥', impuestos:'🏛', manual:'✍️', bolsas:'🛍'}[r.fuente] || '';
         // (25-sep, JP) el 📄 abre el PDF de la factura en OneDrive, no el comprobante en Compras
@@ -1038,10 +1039,10 @@ async function renderPlanilla(){
         html += `<tr class="${r.ok ? '' : 'dim'}"><td style="padding-left:44px">${link} ${esc(r.descripcion)}</td><td>${esc(r.tipo || '')}</td><td class="mini">${esc(r.numero || '')}</td>
           <td class="mini" title="${esc(r.detalle || '')}">${esc((r.detalle || '').slice(0, 60))}${(r.detalle || '').length > 60 ? '…' : ''}</td><td>${accion}</td><td class="num">${plata(r.importe)}</td></tr>`;
       }
+      html += '</tbody>';
     }
-    html += '</table>';
   }
-  document.getElementById('p-body').innerHTML = html;
+  document.getElementById('p-body').innerHTML = '<table data-tt-clave="gastos-planilla"><thead><tr><th>Descripción</th><th>Tipo</th><th>N°</th><th>Detalle</th><th></th><th class="num">Importe</th></tr></thead>' + html + '</table>';
   document.getElementById('p-stat').innerHTML = `Total del mes: <strong>${plata(total)}</strong> · ${R.length} renglones`;
 }
 // ── PDF de la factura en OneDrive (misma base que Compras/_pdfUrl y tesoreria_path_a_weburl) ──
@@ -1083,9 +1084,9 @@ async function renderManuales(){
   const { data } = await sb.from('gastos_manual').select('*').eq('es_prueba', MODO_PRUEBA).order('periodo', { ascending: false }).order('id', { ascending: false }).limit(300);
   const R = data || []; MANUALES = new Map(R.map(r => [r.id, r]));
   if (!R.length){ document.getElementById('g-lista').innerHTML = '<div class="empty">Nada cargado a mano todavía.</div>'; return; }
-  let h = '<table><tr><th>Período</th><th>Unidad</th><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>N°</th><th class="num">Importe</th><th></th></tr>';
-  for (const r of R) h += `<tr><td>${MESES[Number(r.periodo.slice(5,7))-1].slice(0,3)} ${r.periodo.slice(0,4)}</td><td>${esc(uniNombre(r.unidad))}</td><td>${esc(catNombre(r.categoria))}</td><td>${esc(r.descripcion)}</td><td>${esc(r.tipo)}</td><td class="mini">${esc(r.numero || '')}</td><td class="num">${plata(r.importe)}</td><td>${ve('gastos.borrar_manual') ? `<button class="btn" onclick="borrarManual(${r.id})">🗑</button>` : ''}</td></tr>`;
-  document.getElementById('g-lista').innerHTML = h + '</table>';
+  let h = '<table><thead><tr><th>Período</th><th>Unidad</th><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>N°</th><th class="num">Importe</th><th></th></tr></thead><tbody>';
+  for (const r of R) h += `<tr><td data-orden="${r.periodo}">${MESES[Number(r.periodo.slice(5,7))-1].slice(0,3)} ${r.periodo.slice(0,4)}</td><td>${esc(uniNombre(r.unidad))}</td><td>${esc(catNombre(r.categoria))}</td><td>${esc(r.descripcion)}</td><td>${esc(r.tipo)}</td><td class="mini">${esc(r.numero || '')}</td><td class="num">${plata(r.importe)}</td><td>${ve('gastos.borrar_manual') ? `<button class="btn" onclick="borrarManual(${r.id})">🗑</button>` : ''}</td></tr>`;
+  document.getElementById('g-lista').innerHTML = h + '</tbody></table>';
 }
 async function borrarManual(id){
   if (!confirm('¿Borrar este renglón?')) return;
@@ -1115,9 +1116,9 @@ async function renderBolsas(){
   const R = data || []; BOLSAS = new Map(R.map(r => [r.id, r])); const tot = R.reduce((a, r) => a + Number(r.importe), 0);
   let h = `<h3>Bolsas ${anio} · total ${plata(tot)}</h3>`;
   if (!R.length){ document.getElementById('b-lista').innerHTML = h + '<div class="empty">Sin facturas de bolsas este año.</div>'; return; }
-  h += '<table><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="num">Importe</th><th></th></tr>';
+  h += '<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="num">Importe</th><th></th></tr></thead><tbody>';
   for (const r of R) h += `<tr><td>${r.fecha || ''}</td><td>${esc(r.proveedor || '')}</td><td>${esc(r.comprobante || '')}</td><td class="num">${plata(r.importe)}</td><td>${ve('gastos.bolsas') ? `<button class="btn" onclick="borrarBolsa(${r.id})">🗑</button>` : ''}</td></tr>`;
-  document.getElementById('b-lista').innerHTML = h + '</table>';
+  document.getElementById('b-lista').innerHTML = h + '</tbody></table>';
 }
 async function borrarBolsa(id){ if (!confirm('¿Borrar?')) return; const db = await clientePara('gastos.bolsas'); if (!db) return;
   const b = BOLSAS.get(id) || {};
@@ -1134,26 +1135,27 @@ async function renderResumen(){
   const R = data || [];
   if (!R.length){ document.getElementById('r-body').innerHTML = '<div class="empty">Sin meses cerrados. Tildá "incluir meses sin cerrar" para ver lo que hay.</div>'; return; }
   const cerrados = new Set(R.filter(r => r.cerrado).map(r => r.unidad + '|' + r.mes));
-  let h = '<table><tr><th>Unidad / Categoría</th>' + MESES.map(m => `<th class="num">${m.slice(0,3)}</th>`).join('') + '<th class="num">Total</th></tr>';
+  let h = '<table data-tt-clave="gastos-resumen"><thead><tr><th>Unidad / Categoría</th>' + MESES.map(m => `<th class="num">${m.slice(0,3)}</th>`).join('') + '<th class="num">Total</th></tr></thead>';
   let granTotal = 0; const totMes = Array(13).fill(0);
   for (const u of UNIDADES){
     const ru = R.filter(r => r.unidad === u.clave); if (!ru.length) continue;
     const porMes = Array(13).fill(0); ru.forEach(r => porMes[r.mes] += Number(r.importe));
     const tu = porMes.reduce((a, b) => a + b, 0); granTotal += tu; porMes.forEach((v, i) => totMes[i] += v);
-    h += `<tr class="nivel1"><td>${esc(u.nombre)}</td>${porMes.slice(1).map((v, i) => `<td class="num" title="${cerrados.has(u.clave + '|' + (i+1)) ? 'cerrado' : 'sin cerrar'}">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(tu)}</td></tr>`;
+    h += `<tbody><tr class="nivel1 tt-fija"><td>${esc(u.nombre)}</td>${porMes.slice(1).map((v, i) => `<td class="num" title="${cerrados.has(u.clave + '|' + (i+1)) ? 'cerrado' : 'sin cerrar'}">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(tu)}</td></tr>`;
     for (const c of CATS){
       const rc = ru.filter(r => r.categoria === c.clave); if (!rc.length) continue;
       const pm = Array(13).fill(0); rc.forEach(r => pm[r.mes] += Number(r.importe));
       h += `<tr><td style="padding-left:24px">${esc(c.nombre)}</td>${pm.slice(1).map(v => `<td class="num">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(pm.reduce((a,b)=>a+b,0))}</td></tr>`;
     }
+    h += '</tbody>';
   }
-  h += `<tr class="nivel1"><td>TOTAL</td>${totMes.slice(1).map(v => `<td class="num">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(granTotal)}</td></tr></table>`;
+  h += `<tfoot><tr class="nivel1 tt-fija"><td>TOTAL</td>${totMes.slice(1).map(v => `<td class="num">${v ? plata(v) : ''}</td>`).join('')}<td class="num">${plata(granTotal)}</td></tr></tfoot></table>`;
   document.getElementById('r-body').innerHTML = h;
   document.getElementById('r-stat').innerHTML = `Año ${anio}: <strong>${plata(granTotal)}</strong>`;
 }
 
 </script>
-<script src="manual.js?v=15"></script>
-<script src="adorno-tablas.js?v=6761f5ad"></script>
+<script src="manual.js?v=16"></script>
+<script src="adorno-tablas.js?v=e33931fe"></script>
 </body>
 </html>
