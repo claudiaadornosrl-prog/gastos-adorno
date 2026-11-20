@@ -1,5 +1,5 @@
 // Service Worker · network-first para HTML, cache-first para assets
-const CACHE_VERSION = 'gastos-v41-clodi-ir2';
+const CACHE_VERSION = 'gastos-v42-filtro-costado';
 const CACHE_ASSETS = ['fonts/URWGothic-Book.ttf', './', './index.html', './manual.js', './manifest.webmanifest', 'adorno-tablas.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_VERSION).then(c => c.addAll(CACHE_ASSETS)).catch(err => console.warn('[SW]', err)));
